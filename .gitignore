@@ -1,0 +1,48 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.build/
+dist/
+build/
+*.egg-info/
+
+# Virtualenv
+.venv/
+venv/
+.envrc
+.python-version
+
+# --- Project secrets / local config ---
+.env
+*.local.env
+*.secrets.json
+
+# --- Logs / dumps / artifacts ---
+*.log
+logs/
+tmp/
+*.dump
+*.bak
+*.swp
+*.swo
+
+# --- Test / coverage ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# --- Misc ---
+# If you export query results
+*.csv
+*.tsv
+*.parquet
