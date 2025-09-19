@@ -13,21 +13,21 @@ EXPL="${EXPLORER_URL:-https://scan.merlinchain.io}"
 ./scripts/ingest_tokentx_top100.sh "$TOKEN"
 
 # 2) Summarize last 60 minutes (HTML with links + extra insights)
-REPORT=$(psql "$DATABASE_URL" -t -A -F '|' -v "token=$TOKEN" -v "expl=$EXPL" -c "
+REPORT=$(psql "$DATABASE_URL" -t -A -F '|' -c "
 WITH latest AS (
   SELECT max(bucket_start_utc) AS b
   FROM merlin_chain.refined_wallet_top100
-  WHERE contract_address = lower(:'token')
+  WHERE contract_address = lower('${TOKEN}')
 ),
 top100 AS (
   SELECT holder_address
   FROM merlin_chain.refined_wallet_top100 r, latest l
-  WHERE r.contract_address = lower(:'token') AND r.bucket_start_utc = l.b
+  WHERE r.contract_address = lower('${TOKEN}') AND r.bucket_start_utc = l.b
 ),
 w AS (
   SELECT *
   FROM merlin_chain.wallet_transactions
-  WHERE contract_address = lower(:'token')
+  WHERE contract_address = lower('${TOKEN}')
     AND block_time_utc >= now() - interval '60 minutes'
     AND wallet_address IN (SELECT holder_address FROM top100)
 ),
@@ -65,8 +65,7 @@ largest_tx AS (
 ),
 top_lines AS (
   SELECT string_agg(
-           format('<a href=\"%s/address/%s\">%s…%s</a> | IN:<code>%s</code> OUT:<code>%s</code> tx:<code>%s</code>',
-                  :'expl',
+           format('<a href=\"${EXPL}/address/%s\">%s…%s</a> | IN:<code>%s</code> OUT:<code>%s</code> tx:<code>%s</code>',
                   wallet_address,
                   left(wallet_address, 6),
                   right(wallet_address, 4),
@@ -123,5 +122,4 @@ ${LTX_HTML}
 <b>Top movers</b> (by max IN/OUT)
 ${LINES}"
 
-# HTML parse mode
 ./scripts/notify_telegram.sh "$MSG" "HTML"
