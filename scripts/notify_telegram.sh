@@ -1,4 +1,3 @@
-sudo tee /home/ec2-user/merl-etl/scripts/notify_telegram.sh >/dev/null <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -25,6 +24,3 @@ ARGS=( -sS -X POST "$API" -d "chat_id=${TELEGRAM_CHAT_ID}" -d "text=${TEXT}" )
 RESP="$(curl "${ARGS[@]}")" || { echo "[notify] HTTP error from Telegram"; exit 1; }
 echo "[notify] Telegram response: $RESP"
 echo "$RESP" | grep -q '"ok":true' || { echo "[notify] Telegram returned failure"; exit 1; }
-SH
-
-sudo chmod +x /home/ec2-user/merl-etl/scripts/notify_telegram.sh
