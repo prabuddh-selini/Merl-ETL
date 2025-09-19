@@ -12,36 +12,35 @@ EXPL="${EXPLORER_URL:-https://scan.merlinchain.io}"
 # 1) Run the snapshot + Top100 (idempotent within bucket)
 ./scripts/run_holders_and_top100.sh "$TOKEN"
 
-# 2) Build HTML summary from DB and send to Telegram
-SUMMARY=$(psql "$DATABASE_URL" -t -A -F '|' -v "token=$TOKEN" -v "expl=$EXPL" -c "
+# 2) Build HTML summary from DB and send to Telegram (no psql -v)
+SUMMARY=$(psql "$DATABASE_URL" -t -A -F '|' -c "
 WITH bucket AS (
   SELECT max(bucket_start_utc) AS ts
   FROM merlin_chain.holders_raw
-  WHERE contract_address = lower(:'token')
+  WHERE contract_address = lower('${TOKEN}')
 ),
 agg AS (
   SELECT
     (SELECT count(*)
        FROM merlin_chain.holders_raw hr, bucket b
-      WHERE hr.contract_address = lower(:'token') AND hr.bucket_start_utc = b.ts) AS holders,
+      WHERE hr.contract_address = lower('${TOKEN}') AND hr.bucket_start_utc = b.ts) AS holders,
     (SELECT count(*)
        FROM merlin_chain.refined_wallet_top100 r, bucket b
-      WHERE r.contract_address = lower(:'token') AND r.bucket_start_utc = b.ts) AS top_rows
+      WHERE r.contract_address = lower('${TOKEN}') AND r.bucket_start_utc = b.ts) AS top_rows
 ),
 top5 AS (
   SELECT r.rnk,
          r.holder_address,
          r.balance
   FROM merlin_chain.refined_wallet_top100 r, bucket b
-  WHERE r.contract_address = lower(:'token') AND r.bucket_start_utc = b.ts
+  WHERE r.contract_address = lower('${TOKEN}') AND r.bucket_start_utc = b.ts
   ORDER BY r.rnk ASC
   LIMIT 5
 ),
 lines AS (
   SELECT string_agg(
-           format('&#35;%s <a href=\"%s/address/%s\">%s…%s</a> (<code>%s</code>)',
+           format('&#35;%s <a href=\"${EXPL}/address/%s\">%s…%s</a> (<code>%s</code>)',
                   rnk,
-                  :'expl',
                   holder_address,
                   left(holder_address, 6),
                   right(holder_address, 4),
@@ -73,5 +72,4 @@ MSG="<b>MERL snapshot</b> ✅
 <b>Top 5 holders</b>
 ${TOP5HTML}"
 
-# HTML parse mode
 ./scripts/notify_telegram.sh "$MSG" "HTML"
