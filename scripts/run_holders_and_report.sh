@@ -35,7 +35,7 @@ top5 AS (
 SELECT to_char((SELECT ts FROM b),'YYYY-MM-DD HH24:MI\"Z\"')  AS bucket_utc,
        (SELECT holders FROM agg)                               AS holders,
        (SELECT top_rows FROM agg)                              AS top_rows,
-       string_agg(format('#%s %s (%.4f)', rnk, holder_address, balance::numeric), E'\n')
+       string_agg(format('#%s %s (%s)', rnk, holder_address, round(balance::numeric, 4)::text), E'\n')
 FROM top5;
 ")
 
@@ -52,4 +52,4 @@ Top100 rows: ${TOPROWS}
 Top 5:
 ${TOP5}"
 
-./scripts/notify_telegram.sh "$MSG"
+./scripts/notify_telegram.sh "$MSG" ""
