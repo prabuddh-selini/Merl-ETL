@@ -12,7 +12,7 @@ EXPL="${EXPLORER_URL:-https://scan.merlinchain.io}"
 # 1) Run the snapshot + Top100 (idempotent within bucket)
 ./scripts/run_holders_and_top100.sh "$TOKEN"
 
-# 2) Build HTML summary from DB and send to Telegram (use <br/> instead of \n)
+# 2) Build HTML summary from DB and send to Telegram (use <br>, not <br/>)
 SUMMARY=$(psql "$DATABASE_URL" -t -A -F '|' -c "
 WITH bucket AS (
   SELECT max(bucket_start_utc) AS ts
@@ -42,7 +42,7 @@ lines AS (
                   right(holder_address, 4),
                   to_char(round(balance::numeric, 4), 'FM999999999990.0000')
            ),
-           '<br/>'
+           '<br>'
          ) AS html
   FROM top5
 )
@@ -60,12 +60,12 @@ TOP5HTML=$(echo    "$SUMMARY" | cut -d'|' -f4-)
 
 TOKEN_LINK="<a href=\"${EXPL}/token/${TOKEN}\">${TOKEN}</a>"
 
-MSG="<b>MERL snapshot</b> ✅<br/>
-<i>Bucket (UTC):</i> <code>${BUCKET_UTC}</code><br/>
-<i>Token:</i> ${TOKEN_LINK}<br/>
-<i>Total holders:</i> <code>${HOLDERS}</code><br/>
-<i>Top100 rows:</i> <code>${TOPROWS}</code><br/><br/>
-<b>Top 5 holders</b><br/>
+MSG="<b>MERL snapshot</b> ✅<br>
+<i>Bucket (UTC):</i> <code>${BUCKET_UTC}</code><br>
+<i>Token:</i> ${TOKEN_LINK}<br>
+<i>Total holders:</i> <code>${HOLDERS}</code><br>
+<i>Top100 rows:</i> <code>${TOPROWS}</code><br><br>
+<b>Top 5 holders</b><br>
 ${TOP5HTML}"
 
 ./scripts/notify_telegram.sh "$MSG" "HTML"
