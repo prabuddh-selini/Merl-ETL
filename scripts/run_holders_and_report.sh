@@ -52,4 +52,5 @@ Top100 rows: ${TOPROWS}
 Top 5:
 ${TOP5}"
 
+# Force plain text to avoid Markdown pitfalls
 ./scripts/notify_telegram.sh "$MSG" ""

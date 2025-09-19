@@ -10,7 +10,7 @@ fi
 
 API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
 
-# Minimal escaping only if MarkdownV2 explicitly requested (Telegram’s special chars)
+# Minimal escaping only if MarkdownV2 explicitly requested (Telegram special chars)
 esc() { printf '%s' "$1" | sed -e 's/[_*\[\]()`~>#+\-=|{}.!]/\\&/g'; }
 
 TEXT="$MSG"
