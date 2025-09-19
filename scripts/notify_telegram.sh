@@ -1,4 +1,3 @@
-# create/overwrite the notifier
 sudo tee /home/ec2-user/merl-etl/scripts/notify_telegram.sh >/dev/null <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -12,8 +11,8 @@ fi
 
 API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
 
-# Minimal escaping only if MarkdownV2 explicitly requested
-esc() { printf '%s' "$1" | sed -e 's/[_*[\]()`~>#+\-=|{}.!]/\\&/g'; }
+# Minimal escaping only if MarkdownV2 explicitly requested (Telegram’s special chars)
+esc() { printf '%s' "$1" | sed -e 's/[_*\[\]()`~>#+\-=|{}.!]/\\&/g'; }
 
 TEXT="$MSG"
 if [ "${MODE:-}" = "MarkdownV2" ]; then
@@ -25,10 +24,7 @@ ARGS=( -sS -X POST "$API" -d "chat_id=${TELEGRAM_CHAT_ID}" -d "text=${TEXT}" )
 
 RESP="$(curl "${ARGS[@]}")" || { echo "[notify] HTTP error from Telegram"; exit 1; }
 echo "[notify] Telegram response: $RESP"
-
-# require ok:true from Telegram
 echo "$RESP" | grep -q '"ok":true' || { echo "[notify] Telegram returned failure"; exit 1; }
 SH
 
-# make it executable
 sudo chmod +x /home/ec2-user/merl-etl/scripts/notify_telegram.sh
