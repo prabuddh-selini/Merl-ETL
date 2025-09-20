@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 if [ -f ".env" ]; then set -a; source .env; set +a; fi
 chmod +x scripts/run_holders_and_top100.sh
-source scripts/lib_fmt.sh
+source scripts/lib_fmt.sh   # <-- same helpers you used in the probe
 
 TOKEN_ARG="${1:-${TOKEN:-}}"
 if [ -z "$TOKEN_ARG" ]; then echo "TOKEN required"; exit 1; fi
@@ -13,46 +13,46 @@ EXPL="${EXPLORER_URL:-https://scan.merlinchain.io}"
 # 1) Run snapshot + Top100 (idempotent within bucket)
 ./scripts/run_holders_and_top100.sh "$TOKEN"
 
-# 2) Pull latest bucket metrics + Top 10 from DB
-SUMMARY=$(psql "$DATABASE_URL" -t -A -F '|' -c "
+# 2) Header (single row, no aggregation of Top-10 here)
+HDR=$(psql "$DATABASE_URL" -t -A -F '|' -c "
 WITH b AS (
-  SELECT max(bucket_start_utc) ts
+  SELECT max(bucket_start_utc) AS ts
   FROM merlin_chain.holders_raw
   WHERE contract_address = lower('${TOKEN}')
 ),
 agg AS (
   SELECT
-    (SELECT count(*) FROM merlin_chain.holders_raw hr JOIN b ON hr.bucket_start_utc=b.ts
-      WHERE hr.contract_address=lower('${TOKEN}')) AS holders,
-    (SELECT count(*) FROM merlin_chain.refined_wallet_top100 r JOIN b ON r.bucket_start_utc=b.ts
-      WHERE r.contract_address=lower('${TOKEN}')) AS top_rows
-),
-top10 AS (
-  SELECT rnk, holder_address, balance
-  FROM merlin_chain.refined_wallet_top100 r, b
-  WHERE r.contract_address=lower('${TOKEN}') AND r.bucket_start_utc=b.ts
-  ORDER BY rnk ASC
-  LIMIT 10
-),
-tlines AS (
-  SELECT string_agg(format('%s|%s|%s', rnk::text, holder_address, balance::text), E'\n') AS rows
-  FROM top10
+    (SELECT count(*) FROM merlin_chain.holders_raw hr, b
+      WHERE hr.contract_address=lower('${TOKEN}') AND hr.bucket_start_utc=b.ts) AS holders,
+    (SELECT count(*) FROM merlin_chain.refined_wallet_top100 r, b
+      WHERE r.contract_address=lower('${TOKEN}') AND r.bucket_start_utc=b.ts) AS top_rows
 )
 SELECT to_char((SELECT ts FROM b),'YYYY-MM-DD HH24:MI\"Z\"'),
-       (SELECT holders  FROM agg),
-       (SELECT top_rows FROM agg),
-       COALESCE((SELECT rows FROM tlines),'')
-;")
+       (SELECT holders FROM agg),
+       (SELECT top_rows FROM agg);
+")
 
-BUCKET_UTC=$(echo "$SUMMARY" | cut -d'|' -f1)
-TOTAL_HOLDERS=$(echo "$SUMMARY" | cut -d'|' -f2)
-TOP_ROWS=$(echo "$SUMMARY" | cut -d'|' -f3)
-RAW_TOP10=$(echo "$SUMMARY" | cut -d'|' -f4-)
+BUCKET_UTC=$(echo "$HDR" | cut -d'|' -f1)
+TOTAL_HOLDERS=$(echo "$HDR" | cut -d'|' -f2)
+TOP_ROWS=$(echo "$HDR" | cut -d'|' -f3)
 
-# 3) Build Top10 lines like the probe
+# 3) Top-10 as 10 separate rows (safe to parse)
+mapfile -t TOP10 < <(psql "$DATABASE_URL" -t -A -F '|' -c "
+WITH b AS (
+  SELECT max(bucket_start_utc) AS ts
+  FROM merlin_chain.refined_wallet_top100
+  WHERE contract_address = lower('${TOKEN}')
+)
+SELECT rnk, holder_address, balance::text
+FROM merlin_chain.refined_wallet_top100 r, b
+WHERE r.contract_address = lower('${TOKEN}') AND r.bucket_start_utc=b.ts
+ORDER BY rnk ASC
+LIMIT 10;
+")
+
+# 4) Format like the probe
 LINES=""
-IFS=$'\n'
-for row in $RAW_TOP10; do
+for row in "${TOP10[@]}"; do
   IFS='|' read -r rnk addr bal <<<"$row"
   bal="${bal//,/}"
   full2="$(two_dec "$bal")"
@@ -61,6 +61,7 @@ for row in $RAW_TOP10; do
   LINES+=$(printf '<b>#%s</b> %s\n<b>bal</b>: <code>%s</code> <i>(%s)</i>\n%s\n' \
            "$rnk" "$(alink "$addr")" "$full_commas" "$short2" "$SPACER_LINE")
 done
+unset IFS
 
 TOKEN_LINK="<a href=\"${EXPL}/token/${TOKEN}\">MERL</a>"
 
